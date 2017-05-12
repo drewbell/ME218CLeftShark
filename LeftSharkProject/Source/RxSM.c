@@ -9,7 +9,9 @@
    This is a ME218C Team LeftShark XBEE UART Module made upon the
    Gen2 Events and Services Framework.
 
- Notes
+  Notes: 
+  
+  5/12 - need to establish proper length of connection loss timer, UART_TIMEOUT
 
  History
  When           Who     What/Why
@@ -31,8 +33,15 @@
 /*----------------------------- Module Defines ----------------------------*/
 
 #define CHAR_WAIT_PRD   2         //amount of time to wait before signaling a lost connection = between 1 and 2ms)
-#define RX_INTERRUPT_M BIT4HI     //RTMIS is bit 4 of UARTMIS
-#define RX_DATA_M 0xFF            // to makes first 8 bits of UARTDR  
+#define RX_INTERRUPT_M    BIT4HI     //RTMIS is bit 4 of UARTMIS
+#define RX_DATA_M   0xFF            // to makes first 8 bits of UARTDR 
+#define OVER_RUN_BIT_M    BIT11HI
+#define BREAK_ERROR_BIT_M   BIT10HI
+#define PARITY_ERROR_BIT_M   BIT9HI
+#define FRAMING_ERROR_BIT_M   BIT8HI
+#define CLR_UART_ERR_FLAGS    0xff
+#define XBEE_START_DELIMITER  0x7e   
+
 
 /*---------------------------- Module Functions ---------------------------*/
 /* prototypes for private functions for this machine.They should be functions
@@ -40,13 +49,21 @@
 */
 
 void ClearRxVars (void);
+void PrintUARTErrors (void);
 
 /*---------------------------- Module Variables ---------------------------*/
 // everybody needs a state variable, you may need others as well.
 // type of state variable should match that of enum in header file
 static RxState_t CurrentState;
 static uint16_t FrameLength = 0;
+static uint8_t FrameLengthMSB = 0;
+static uint8_t FrameLengthLSB = 0;
 static uint8_t RxInterruptBit = 0; 
+static uint8_t OverRunBit = 0;
+static uint8_t BreakErrorBit = 0;
+static uint8_t ParityErrorBit = 0;
+static uint8_t FramingErrorBit = 0;
+
 static uint8_t RxData = 0;
 
 // with the introduction of Gen2, we need a module level Priority var as well
@@ -112,7 +129,7 @@ bool InitRxSM ( uint8_t Priority )
  Author
      Drew Bell, 05/11/17, 19:25
 ****************************************************************************/
-bool PostRxFSM( ES_Event ThisEvent )
+bool PostRxSM( ES_Event ThisEvent )
 {
   return ES_PostToService( MyPriority, ThisEvent);
 }
@@ -138,7 +155,7 @@ ES_Event RunRxSM( ES_Event ThisEvent )
 {
   ES_Event ReturnEvent;
   ReturnEvent.EventType = ES_NO_EVENT; // assume no errors
-
+  
   switch ( CurrentState )
   {
     case WaitFor0x7E :       // If current state is initial State
@@ -154,19 +171,23 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
           
         }
+        else if ( ThisEvent.EventType == ES_UART_ERROR_FLAG)
+          {
+            //call UART print error function and stay in WaitFor0x7E state
+            PrintUARTErrors();
+          }
          break;
 
     case WaitForMSBLen :       // If current state is WaitForMSBLen
       switch ( ThisEvent.EventType )
       {
         case ES_BYTE_RECEIVED : //If event is a received byte
-          
-            // Set MSB of Len
-            
-        
+            // Set MSB of Length to the value event parameter sent from the ISR
+            FrameLengthMSB = ThisEvent.EventParam;
             // Start DoubleCharacter timer
+            ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
             // Change CurrentState to WaitForLSBLen
-        
+            CurrentState = WaitForLSBLen;
           break;
 
         // repeat cases as required for relevant events
@@ -178,6 +199,9 @@ ES_Event RunRxSM( ES_Event ThisEvent )
     default :
       ;
   }                                   // end switch on Current State
+  
+ 
+  
   return ReturnEvent;
 }
 
@@ -227,10 +251,60 @@ RxState_t QueryRxSM ( void )
 ****************************************************************************/
 void ClearRxVars ( void )
 {
-  FrameLength = 0;      //clear frame length
+  FrameLength = 0;      //clear frame length variables
+  FrameLengthMSB = 0;
+  FrameLengthLSB = 0;
 
 }
 
+
+/****************************************************************************
+ Function
+     PrintUARTErrors
+
+ Parameters
+     None
+
+ Returns
+     Nothing
+
+ Description
+     prints error messages based on which UART errors occur
+ Notes
+
+ Author
+     Drew Bell, 05/11/17, 19:21
+****************************************************************************/
+void PrintUARTErrors ( void )
+{
+ 
+  //If overRun error bit is set, print overrun error msg
+  if (OverRunBit) 
+  {
+      printf("\n\rOverRun Error in UART Rx : Connection Lost");
+  }
+  
+  //Else if break error bit is set, print break error msg
+  else if (BreakErrorBit) 
+  {
+      printf("\n\rBreak Error in UART Rx : Connection Lost");
+	}
+  
+  //else if parity error bit is set, print parity error msg
+  else if (ParityErrorBit)  
+  {
+		  printf("\n\rParity Error in UART Rx : Connection Lost");
+  }
+  
+  // else if framing error bit is set, print framing error msg
+  else if (FramingErrorBit)	
+  {
+      printf("\n\rFraming Error in UART Rx : Connection Lost");
+  }
+
+return;
+
+}
 
 
 
@@ -251,28 +325,51 @@ void RxISR (void)
       //Clear the source of the interrupt in UARTICR
       HWREG(UART1_BASE + UART_O_MIS) |= RX_INTERRUPT_M;
       //Read the data in UARTDR into NewRxByte
-     RxData = (HWREG(UART1_BASE + UART_O_DR) | RX_DATA_M);
+      RxData = ( HWREG(UART1_BASE + UART_O_DR) | RX_DATA_M);
       //Read OverRun bit in UARTDR into OverRunFlag
+      OverRunBit = ( HWREG(UART1_BASE + UART_O_DR) | OVER_RUN_BIT_M );
       //Read BreakError bit in UARTDR into BreakErrorFlag
+      BreakErrorBit = ( HWREG(UART1_BASE + UART_O_DR) | BREAK_ERROR_BIT_M );
       //Read ParityError bit in UARTDR into ParityErrorFlag
+      ParityErrorBit = ( HWREG(UART1_BASE + UART_O_DR) | PARITY_ERROR_BIT_M );
       //Read FramingError bit in UARTDR into FramingErrorFlag
+      FramingErrorBit = ( HWREG(UART1_BASE + UART_O_DR) | FRAMING_ERROR_BIT_M );
 
-
-  //If OverRunFlag OR BreakErrorFlag OR ParityErrorFlag OR FramingError is true 
-    //Write to UARTECR register to clear error flags (W1C)
-    //Post RxConnectionLost event
-  //Else (if data is good)
-    //If btye is 0x7E
-    //Create new event called ThisEvent
-    //Set EventType to be NewStartByte
-  //Post ThisEvent to RxSM
-  //Else if byte is anything else
-  //Create new event called ThisEvent
-    //Set EventType to be NewDataByte
-  //Post ThisEvent to RxSM
-  //Endif	
-  //Endif
-	//Endif 
+      //If OverRunFlag OR BreakErrorFlag OR ParityErrorFlag OR FramingError is true 
+      if ( OverRunBit | BreakErrorBit | ParityErrorBit | FramingErrorBit) {
+        //Write to UARTECR register to clear error flags (W1C)
+        HWREG(UART1_BASE + UART_O_DR) |= CLR_UART_ERR_FLAGS; 
+        //Post ES_UART_ERROR_FLAG event to RxSM
+        ES_Event ThisEvent;
+        ThisEvent.EventType = ES_UART_ERROR_FLAG; 
+        PostRxSM(ThisEvent);
+        
+      }
+      //Else (if data is good)
+      else {
+        //If btye is 0x7E
+        if ( RxData == XBEE_START_DELIMITER){
+            //Create new event called ThisEvent
+            ES_Event ThisEvent;
+            //Set EventType to be NewStartByte 
+            ThisEvent.EventType = ES_0x7E_RECEIVED;
+            
+            //Post ThisEvent to RxSM
+            PostRxSM(ThisEvent);
+        }
+        //Else the next byte is a data byte
+        else {
+            //Create new event called ThisEvent
+            ES_Event ThisEvent;
+            //Set EventType to be NewDataByte and EventParam to be the new byte received
+            ThisEvent.EventType = ES_BYTE_RECEIVED;
+            ThisEvent.EventParam = RxData;
+            //Post ThisEvent to RxSM
+            PostRxSM(ThisEvent);
+        }
+      }
+    }
+  
 
   
   

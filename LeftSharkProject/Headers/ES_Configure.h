@@ -259,6 +259,7 @@ typedef enum {  ES_NO_EVENT = 0,
                 ES_LOCK,
                 ES_0x7E_RECEIVED,
                 ES_BYTE_RECEIVED,
+                ES_UART_ERROR_FLAG,
                 ES_UNLOCK} ES_EventTyp_t ;
 
 /****************************************************************************/
