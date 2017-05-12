@@ -257,6 +257,8 @@ typedef enum {  ES_NO_EVENT = 0,
                 /* User-defined events start here */
                 ES_NEW_KEY, /* signals a new key received from terminal */
                 ES_LOCK,
+                ES_0x7E_RECEIVED,
+                ES_BYTE_RECEIVED,
                 ES_UNLOCK} ES_EventTyp_t ;
 
 /****************************************************************************/
@@ -304,7 +306,7 @@ typedef enum {  ES_NO_EVENT = 0,
 // Unlike services, any combination of timers may be used and there is no
 // priority in servicing them
 #define TIMER_UNUSED ((pPostFunc)0)
-#define TIMER0_RESP_FUNC TIMER_UNUSED
+#define TIMER0_RESP_FUNC UART_TIMEOUT
 #define TIMER1_RESP_FUNC TIMER_UNUSED
 #define TIMER2_RESP_FUNC TIMER_UNUSED
 #define TIMER3_RESP_FUNC TIMER_UNUSED
@@ -329,5 +331,7 @@ typedef enum {  ES_NO_EVENT = 0,
 // These symbolic names should be changed to be relevant to your application 
 
 #define SERVICE0_TIMER 15
+
+#define UART_TIMEOUT 0
 
 #endif /* CONFIGURE_H */

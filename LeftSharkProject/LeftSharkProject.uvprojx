@@ -408,6 +408,11 @@
               <FileType>1</FileType>
               <FilePath>.\Source\ES_ShortTimer.c</FilePath>
             </File>
+            <File>
+              <FileName>RxSM.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Source\RxSM.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -517,6 +522,11 @@
               <FileName>ES_ShortTimer.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Headers\ES_ShortTimer.h</FilePath>
+            </File>
+            <File>
+              <FileName>RxSM.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Headers\RxSM.h</FilePath>
             </File>
           </Files>
         </Group>
