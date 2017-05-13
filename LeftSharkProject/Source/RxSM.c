@@ -33,16 +33,12 @@
 
 /*----------------------------- Module Defines ----------------------------*/
 
-#define CHAR_WAIT_PRD   2               // amount of time to wait before signaling a lost connection = between 1 and 2ms)
+#define CONNECTION_TIMEOUT_PRD   1000            // amount of time to wait before signaling a lost connection = 1 second (1000ms)
 #define RX_DATA_M   0xFF                // to makes first 8 bits of UARTDR 
-#define OVER_RUN_BIT_M    BIT11HI
-#define BREAK_ERROR_BIT_M   BIT10HI
-#define PARITY_ERROR_BIT_M   BIT9HI
-#define FRAMING_ERROR_BIT_M   BIT8HI
 #define CLR_UART_ERR_FLAGS    0xFF
 #define XBEE_START_DELIMITER  0x7E   
 #define ALL_BITS_HI     0xFF
-#define LONGEST_PACKET_LENGTH   0x0F    // placeholder for longest packet length
+#define LONGEST_PACKET_LENGTH   0x96    // placeholder for longest packet length
 #define NUM_OVERHEAD_BYTES  4           // counts start delimiter, MSB length, LSB length, ChkSum
 
 //ifdef defines
@@ -199,13 +195,10 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             
             //place RxDataByte into RxDataPacket and increment RxArrayIndex
             RxDataPacket[RxArrayIndex] = RxDataByte;
-            
-            
-            
             RxArrayIndex++;
           
-            // Start a timer to check for lost connection
-            //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+            // Start Connection Timeout timer
+            //ES_Timer_InitTimer(UART_TIMEOUT , CONNECTION_TIMEOUT_PRD);
         }
         else if ( ThisEvent.EventType == ES_UART_ERROR_FLAG)
           {
@@ -223,8 +216,9 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 //place RxDataByte into RxDataPacket and increment RxArrayIndex
                 RxDataPacket[RxArrayIndex] = RxDataByte;
                 RxArrayIndex++;
-                // Start DoubleCharacter timer
-                //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+            
+                // Start Connection Timeout timer
+                //ES_Timer_InitTimer(UART_TIMEOUT , CONNECTION_TIMEOUT_PRD);
                 // Change CurrentState to WaitForLSBLen
                 CurrentState = WaitForLSBLen;
             
@@ -242,10 +236,11 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             break;
                   
             case ES_UART_ERROR_FLAG : //If EventType of ThisEvent is ES_UART_ERROR_FLAG
-                //Print error messages based on error type
-                PrintUARTErrors();
                 //Change to WaitFor0x7E state
                 CurrentState = WaitFor0x7E;
+                //Print error messages based on error type
+                PrintUARTErrors();
+                
                 #ifdef RxTestPrints
                 printf("\n\rUART Error:  WaitForMSB --> WaitFor0x7E State");
                 #endif
@@ -267,8 +262,10 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 BytesLeft = 0; 
                 BytesLeft = ( (FrameLengthMSB<<8) | FrameLengthLSB );
                 PacketLength = BytesLeft + NUM_OVERHEAD_BYTES;
-                // Start DoubleCharacter timer
-                //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+                
+                // Start Connection Timeout timer
+                //ES_Timer_InitTimer(UART_TIMEOUT , CONNECTION_TIMEOUT_PRD);
+            
                 // Change CurrentState to ReadDataPacket
                 CurrentState = ReadDataPacket;
                 #ifdef RxTestPrints
@@ -285,14 +282,14 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             break;
                   
             case ES_UART_ERROR_FLAG : //If EventType of ThisEvent is ES_UART_ERROR_FLAG
-                //Print error messages based on error type
-                PrintUARTErrors();
                 //Change to WaitFor0x7E state
                 CurrentState = WaitFor0x7E;
+                //Print error messages based on error type
+                PrintUARTErrors();
                 #ifdef RxTestPrints
                 printf("\n\rUART Error:  WaitForMLSB --> WaitFor0x7E State");
                 #endif
-            break;
+                break;
         }   //end switch on CurrentEvent
         break;  //break for WaitForLSBLen
         
@@ -317,14 +314,13 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             printf("    BytesLeft = %i",BytesLeft);
             #endif            
             
-            
-            
             // Add DataByte to ChkSum
             ChkSum = ChkSum + RxDataByte;
-            // Start DoubleCharacter Timer
-            //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
             
+            // Start Connection Timeout timer
+            //ES_Timer_InitTimer(UART_TIMEOUT , CONNECTION_TIMEOUT_PRD);
         } 
+        
         //If EventType of ThisEvent is Byte Received AND BytesLeft EQUAL to zero
         else if( (ThisEvent.EventType == ES_BYTE_RECEIVED) && (BytesLeft == 0) ) {
             //place RxDataByte into RxDataPacket
@@ -366,8 +362,12 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 
                 #ifdef PrintRecdPacket
                 for (uint8_t i = 0 ; i < PacketLength ; i++)
-                    printf("\n\r%d", RxDataPacket[i]);             
+                    printf("\n\r%x", RxDataPacket[i]);     
+
+                printf("\n\rEOT*****************\n\n\r");
                 #endif
+                
+                
                 
                 #ifdef RxTestPrints
                 printf("\n\rPacket Complete: Head to WaitFor0x7E State");
@@ -386,21 +386,20 @@ ES_Event RunRxSM( ES_Event ThisEvent )
 
         //If EventType of ThisEvent is ES_UART_ERROR_FLAG
         else if( ThisEvent.EventType == ES_UART_ERROR_FLAG ){
-            //Print error messages based on error type
-            PrintUARTErrors();
             //Change to WaitFor0x7E state
             CurrentState = WaitFor0x7E;
+            //Print error messages based on error type
+            PrintUARTErrors();
+            
             #ifdef RxTestPrints
             printf("\n\rUART Error: ReadDataPacket --> WaitFor0x7E State");
             #endif
         }
         
-    break;      
-  }      // end switch on Current State
+        break;      
+    }      // end switch on Current State
   
- 
-
-  return ReturnEvent;
+    return ReturnEvent;
 }
 
 /****************************************************************************
@@ -511,20 +510,20 @@ void PrintUARTErrors ( void )
       printf("\n\rOverRun Error in UART Rx : Connection Lost");
   }
   
-  //Else if break error bit is set, print break error msg
-  else if (BreakErrorBit) 
+  // if break error bit is set, print break error msg
+  if (BreakErrorBit) 
   {
       printf("\n\rBreak Error in UART Rx : Connection Lost");
 	}
   
-  //else if parity error bit is set, print parity error msg
-  else if (ParityErrorBit)  
+  // if parity error bit is set, print parity error msg
+  if (ParityErrorBit)  
   {
 		  printf("\n\rParity Error in UART Rx : Connection Lost");
   }
   
-  // else if framing error bit is set, print framing error msg
-  else if (FramingErrorBit)	
+  // if framing error bit is set, print framing error msg
+  if (FramingErrorBit)	
   {
       printf("\n\rFraming Error in UART Rx : Connection Lost");
   }
@@ -538,7 +537,6 @@ void PrintUARTErrors ( void )
 return;
 
 }
-
 
 
 /***************************************************************************
@@ -562,14 +560,14 @@ void RxISR (void)
        RxInterruptBit = 0; 
        //Read the data in UARTDR into NewRxByte
        RxDataByte = ( HWREG(UART1_BASE + UART_O_DR) );       
-       //Read OverRun bit in UARTDR into OverRunFlag
-       OverRunBit = ( HWREG(UART1_BASE + UART_O_RSR) | UART_RSR_OE );
-       //Read BreakError bit in UARTDR into BreakErrorFlag
-       BreakErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) | UART_RSR_BE );
-       //Read ParityError bit in UARTDR into ParityErrorFlag
-       ParityErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) | UART_RSR_PE );
-       //Read FramingError bit in UARTDR into FramingErrorFlag
-       FramingErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) | UART_RSR_FE );
+       //Read OverRun bit in UARTDR into OverRunBit
+       OverRunBit = ( HWREG(UART1_BASE + UART_O_RSR) & UART_RSR_OE );
+       //Read BreakError bit in UARTDR into BreakErrorBit
+       BreakErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) & UART_RSR_BE );
+       //Read ParityError bit in UARTDR into ParityErrorBit
+       ParityErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) & UART_RSR_PE );
+       //Read FramingError bit in UARTDR into FramingErrorBit
+       FramingErrorBit = ( HWREG(UART1_BASE + UART_O_RSR) & UART_RSR_FE );
 
        //If OverRunFlag OR BreakErrorFlag OR ParityErrorFlag OR FramingError is true 
        if ( OverRunBit | BreakErrorBit | ParityErrorBit | FramingErrorBit) {
@@ -578,8 +576,7 @@ void RxISR (void)
            //Post ES_UART_ERROR_FLAG event to RxSM
            ES_Event ThisEvent;
            ThisEvent.EventType = ES_UART_ERROR_FLAG; 
-           PostRxSM(ThisEvent);
-           
+           PostRxSM(ThisEvent); 
        }
        //Else (if data is good)
        else {
