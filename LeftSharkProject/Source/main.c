@@ -31,7 +31,7 @@ int main(void)
 
 	// When doing testing, it is useful to announce just which program
 	// is running.
-	puts("\rStarting Test Harness for \r");
+	puts("\rStarting Team LeftShark Rx written the \r");
 	printf("the 2nd Generation Events & Services Framework V2.2\r\n");
 	printf("%s %s\n",__TIME__, __DATE__);
 	printf("\n\r\n");

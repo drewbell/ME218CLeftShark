@@ -414,6 +414,11 @@
               <FileType>1</FileType>
               <FilePath>.\Source\RxSM.c</FilePath>
             </File>
+            <File>
+              <FileName>MapKeys.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Source\MapKeys.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -529,6 +534,11 @@
               <FileType>5</FileType>
               <FilePath>.\Headers\RxSM.h</FilePath>
             </File>
+            <File>
+              <FileName>MapKeys.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Headers\MapKeys.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -623,6 +633,11 @@
           </GroupOption>
           <Files>
             <File>
+              <FileName>ES_LookupTables.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Source\ES_LookupTables.c</FilePath>
+            </File>
+            <File>
               <FileName>ES_CheckEvents.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Source\ES_CheckEvents.c</FilePath>
@@ -636,11 +651,6 @@
               <FileName>ES_Framework.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Source\ES_Framework.c</FilePath>
-            </File>
-            <File>
-              <FileName>ES_LookupTables.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Source\ES_LookupTables.c</FilePath>
             </File>
             <File>
               <FileName>ES_Port.c</FileName>

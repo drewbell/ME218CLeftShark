@@ -15,4 +15,8 @@
 .\outputs\es_postlist.o: .\Headers\ES_PostList.h
 .\outputs\es_postlist.o: .\Headers\ES_Events.h
 .\outputs\es_postlist.o: .\Headers\ES_ServiceHeaders.h
-.\outputs\es_postlist.o: .\Headers\TestHarnessService0.h
+.\outputs\es_postlist.o: .\Headers\RxSM.h
+.\outputs\es_postlist.o: .\Headers\MapKeys.h
+.\outputs\es_postlist.o: .\Headers\ES_Framework.h
+.\outputs\es_postlist.o: .\Headers\ES_CheckEvents.h
+.\outputs\es_postlist.o: .\Headers\ES_Timers.h

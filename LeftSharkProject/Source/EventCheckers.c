@@ -116,7 +116,7 @@ bool Check4Keystroke(void)
     if ( ThisEvent.EventParam == 'L'){
       ES_PostList00( ThisEvent );
     }else{   // otherwise post to Service 0 for processing
-      PostTestHarnessService0( ThisEvent );
+      PostMapKeys( ThisEvent );
     }
     return true;
   }

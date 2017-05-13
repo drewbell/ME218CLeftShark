@@ -29,12 +29,13 @@
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
 #include "RxSM.h"
+#include "HardwareInits.h"
 
 /*----------------------------- Module Defines ----------------------------*/
 
-#define CHAR_WAIT_PRD   2         //amount of time to wait before signaling a lost connection = between 1 and 2ms)
-#define RX_INTERRUPT_M    BIT4HI     //RTMIS is bit 4 of UARTMIS
-#define RX_DATA_M   0xFF            // to makes first 8 bits of UARTDR 
+#define CHAR_WAIT_PRD   2               // amount of time to wait before signaling a lost connection = between 1 and 2ms)
+#define RX_INTERRUPT_M    BIT4HI        // RTMIS is bit 4 of UARTMIS
+#define RX_DATA_M   0xFF                // to makes first 8 bits of UARTDR 
 #define OVER_RUN_BIT_M    BIT11HI
 #define BREAK_ERROR_BIT_M   BIT10HI
 #define PARITY_ERROR_BIT_M   BIT9HI
@@ -42,7 +43,12 @@
 #define CLR_UART_ERR_FLAGS    0xFF
 #define XBEE_START_DELIMITER  0x7E   
 #define ALL_BITS_HI     0xFF
-#define LONGEST_PACKET_LENGTH   0xFF    //placeholder for longest packet length
+#define LONGEST_PACKET_LENGTH   0x05    // placeholder for longest packet length
+#define NUM_OVERHEAD_BYTES  4           // counts start delimiter, MSB length, LSB length, ChkSum
+
+//ifdef defines
+#define RxTestPrints
+#define PrintRecdPacket
 
 
 /*---------------------------- Module Functions ---------------------------*/
@@ -58,9 +64,9 @@ void ClearRxDataPacket ( void );
 // everybody needs a state variable, you may need others as well.
 // type of state variable should match that of enum in header file
 static RxState_t CurrentState;
-static uint16_t FrameLength = 0;
 static uint8_t FrameLengthMSB = 0;
 static uint8_t FrameLengthLSB = 0;
+static uint8_t PacketLength = 0;
 static uint16_t BytesLeft = 0;
 static uint16_t RxArrayIndex = 0;      //which byte we are working with in the RxDataPacket array
 static uint8_t RxInterruptBit = 0; 
@@ -107,9 +113,14 @@ bool InitRxSM ( uint8_t Priority )
   MyPriority = Priority;
 	
 	// call UART Initialization function in another module
+    InitUARTS();
 	
   // put us into the Initial PseudoState
   CurrentState = WaitFor0x7E;
+    
+    #ifdef RxTestPrints
+            printf("\n\rInit to WaitFor0x7E State");
+    #endif
 	
   // post the initial transition event
   ThisEvent.EventType = ES_INIT;
@@ -173,6 +184,10 @@ ES_Event RunRxSM( ES_Event ThisEvent )
         if ( ThisEvent.EventType == ES_0x7E_RECEIVED ) {// only respond to ES_Init
             // Change CurrentState to WaitForMSBLen
             CurrentState = WaitForMSBLen;
+            
+            #ifdef RxTestPrints
+            printf("\n\rGood Start Delimiter:   WaitFor0x7E --> WaitForMSBLen State");
+            #endif
           
             // Clear receive variables
             ClearRxVars();
@@ -182,7 +197,7 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             RxArrayIndex++;
           
             // Start a timer to check for lost connection
-            ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+            //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
         }
         else if ( ThisEvent.EventType == ES_UART_ERROR_FLAG)
           {
@@ -201,14 +216,21 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 RxDataPacket[RxArrayIndex] = RxDataByte;
                 RxArrayIndex++;
                 // Start DoubleCharacter timer
-                ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+                //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
                 // Change CurrentState to WaitForLSBLen
                 CurrentState = WaitForLSBLen;
+            
+                #ifdef RxTestPrints
+                printf("\n\rGood MSB:   WaitForMSBLen --> WaitForLSBLen State");
+                #endif
             break;
           
             case ES_TIMEOUT : //If EventType of ThisEvent is timeout
                 //Change CurrentState to WaitFor0x7E
                 CurrentState = WaitFor0x7E;
+                #ifdef RxTestPrints
+                printf("\n\rTimeout:    WaitForMSBLen --> WaitFor0x7E State");
+                #endif  
             break;
                   
             case ES_UART_ERROR_FLAG : //If EventType of ThisEvent is ES_UART_ERROR_FLAG
@@ -216,6 +238,9 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 PrintUARTErrors();
                 //Change to WaitFor0x7E state
                 CurrentState = WaitFor0x7E;
+                #ifdef RxTestPrints
+                printf("\n\rUART Error:  WaitForMSB --> WaitFor0x7E State");
+                #endif
             break;  //break for EventType switch
         }   //end switch on CurrentEvent
       break;    //break for WaitForMSBLen
@@ -230,18 +255,25 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 //place RxDataByte into RxDataPacket and increment RxArrayIndex
                 RxDataPacket[RxArrayIndex] = RxDataByte;
                 RxArrayIndex++;
-                //Combine MSB and LSB into BytesLeft
+                //Combine MSB and LSB into BytesLeft, then calculate a message length variable
                 BytesLeft = 0; 
+                PacketLength = BytesLeft + NUM_OVERHEAD_BYTES;
                 BytesLeft = ( (FrameLengthMSB<<8) | FrameLengthLSB );
                 // Start DoubleCharacter timer
-                ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+                //ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
                 // Change CurrentState to ReadDataPacket
                 CurrentState = ReadDataPacket;
+                #ifdef RxTestPrints
+                printf("\n\rGood LSB:   WaitForLSBLen --> ReadDataPacket State");
+                #endif
             break;
           
             case ES_TIMEOUT : //If EventType of ThisEvent is timeout
                 //Change CurrentState to WaitFor0x7E
                 CurrentState = WaitFor0x7E;
+                #ifdef RxTestPrints
+                printf("\n\rTimeout:  WaitForLSB --> WaitFor0x7E State");
+                #endif
             break;
                   
             case ES_UART_ERROR_FLAG : //If EventType of ThisEvent is ES_UART_ERROR_FLAG
@@ -249,27 +281,49 @@ ES_Event RunRxSM( ES_Event ThisEvent )
                 PrintUARTErrors();
                 //Change to WaitFor0x7E state
                 CurrentState = WaitFor0x7E;
+                #ifdef RxTestPrints
+                printf("\n\rUART Error:  WaitForMLSB --> WaitFor0x7E State");
+                #endif
             break;
         }   //end switch on CurrentEvent
         break;  //break for WaitForLSBLen
         
     case ReadDataPacket : //CurrentState is ReadDataPacket
+        #ifdef RxTestPrints
+        printf("\n\rEntered ReadDataPacket");
+        #endif
         //If EventType of ThisEvent is Byte Received AND BytesLeft NOT EQUAL to zero
         if( ( ThisEvent.EventType == ES_BYTE_RECEIVED ) && ( BytesLeft != 0 )){       
             //place RxDataByte into RxDataPacket and increment RxArrayIndex
             RxDataPacket[RxArrayIndex] = RxDataByte;
+            
+            #ifdef RxTestPrints
+            printf("    DataByte Read = %i", RxDataPacket[RxArrayIndex]);
+            #endif
+            
             RxArrayIndex++;
             //Decrement BytesLeft
-            --BytesLeft;
+            BytesLeft--;
+            
+            #ifdef RxTestPrints
+            printf("    Bytesleft = %i",BytesLeft);
+            #endif
+            
             // Add DataByte to ChkSum
             ChkSum = ChkSum + RxDataByte;
             // Start DoubleCharacter Timer
-            ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+            ////ES_Timer_InitTimer(UART_TIMEOUT , CHAR_WAIT_PRD);
+            
         } 
         //If EventType of ThisEvent is Byte Received AND BytesLeft EQUAL to zero
-        if( (ThisEvent.EventType == ES_BYTE_RECEIVED) && (BytesLeft == 0) ) {
+        else if( (ThisEvent.EventType == ES_BYTE_RECEIVED) && (BytesLeft == 0) ) {
             //place RxDataByte into RxDataPacket
             RxDataPacket[RxArrayIndex] = RxDataByte;
+            
+            #ifdef RxTestPrints
+            printf("\n\rRead CheckSum = %c", RxDataPacket[RxArrayIndex]);
+            #endif
+            
             // Pull XbeeChkSum out of the last index of RxDataPacket
             XbeeChkSum = RxDataPacket[RxArrayIndex];
             // Add DataByte to ChkSum
@@ -281,28 +335,47 @@ ES_Event RunRxSM( ES_Event ThisEvent )
             if ( XbeeChkSum != ChkSum ){
                 //Change states to WaitFor0x7E
                 CurrentState = WaitFor0x7E;
+                #ifdef RxTestPrints
+                printf("\n\rChkSum Mismatch:  ReadDataPacket --> WaitFor0x7E State");
+                #endif
             }
             //Else if Chksum is good
             else if ( XbeeChkSum == ChkSum ) {
                 //Post PacketReceived event
                 /***** add post function ****/
-                //print for now
+                       
+                //change to WaitFor0x7E to wait for next packet
+                CurrentState = WaitFor0x7E;
+                
+                #ifdef RxTestPrints
                 printf("\n\rPacket Received");
+                #endif
+                
+                #ifdef PrintRecdPacket
+                for (uint8_t i = 1 ; i <= PacketLength ; i++)
+                    printf("\n\r%04x", RxDataPacket[i-1]);             
+                #endif 
             }
         }
 
         //If EventType of ThisEvent is Timeout
-        if( ThisEvent.EventType == ES_TIMEOUT){
+        else if( ThisEvent.EventType == ES_TIMEOUT){
             //Change states to WaitFor0x7E
             CurrentState = WaitFor0x7E;
+            #ifdef RxTestPrints
+            printf("\n\rTimeout:  ReadDataPacket --> WaitFor0x7E State");
+            #endif
         }
 
         //If EventType of ThisEvent is ES_UART_ERROR_FLAG
-        if( ThisEvent.EventType == ES_UART_ERROR_FLAG ){
+        else if( ThisEvent.EventType == ES_UART_ERROR_FLAG ){
             //Print error messages based on error type
             PrintUARTErrors();
             //Change to WaitFor0x7E state
             CurrentState = WaitFor0x7E;
+            #ifdef RxTestPrints
+            printf("\n\rUART Error: ReadDataPacket --> WaitFor0x7E State");
+            #endif
         }
         break;  
 
@@ -358,14 +431,14 @@ RxState_t QueryRxSM ( void )
      Drew Bell, 05/11/17, 19:21
 ****************************************************************************/
 void ClearRxVars ( void )
-{
-  FrameLength = 0;      //clear frame length variables
-  FrameLengthMSB = 0;
+{     
+  FrameLengthMSB = 0;   //clear frame length variables
   FrameLengthLSB = 0;
+  PacketLength = 0;
   ChkSum = 0;           //clear checksums
   XbeeChkSum = 0;
   ClearRxDataPacket();
-  RxArrayIndex = 0;        //clear count of which byte we are workign with in the RxDataPacket array
+  RxArrayIndex = 0;     //clear count of which byte we are workign with in the RxDataPacket array
     
 }
 
@@ -388,7 +461,7 @@ void ClearRxVars ( void )
 ****************************************************************************/
 void ClearRxDataPacket ( void )
 {
-  for(uint8_t i = 0 ; LONGEST_PACKET_LENGTH ; i++){
+  for(uint8_t i = 0 ; i < LONGEST_PACKET_LENGTH ; i++){
       RxDataPacket[i] = 0;
   }
  
@@ -493,7 +566,6 @@ void RxISR (void)
                 ES_Event ThisEvent;
                 //Set EventType to be NewStartByte 
                 ThisEvent.EventType = ES_0x7E_RECEIVED;
-            
                 //Post ThisEvent to RxSM
                 PostRxSM(ThisEvent);
             }

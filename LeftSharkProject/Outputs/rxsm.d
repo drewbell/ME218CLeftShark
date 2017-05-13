@@ -21,3 +21,4 @@
 .\outputs\rxsm.o: C:\ti\TivaWare_C_Series-2.1.0.12573\inc/hw_types.h
 .\outputs\rxsm.o: C:\ti\TivaWare_C_Series-2.1.0.12573\inc/hw_memmap.h
 .\outputs\rxsm.o: .\Headers\RxSM.h
+.\outputs\rxsm.o: .\Headers\HardwareInits.h
