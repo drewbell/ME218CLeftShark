@@ -112,13 +112,14 @@ ES_Event RunMapKeys( ES_Event ThisEvent )
   ES_Event ReturnEvent;
   ReturnEvent.EventType = ES_NO_EVENT; // assume no errors
   
-  static uint8_t key;
+  //static uint8_t key;
 
     if ( ThisEvent.EventType == ES_NEW_KEY) // there was a key pressed
     {
-        key = toupper(ThisEvent.EventParam);  
+        
         //print the received character:
-        printf("\n\rNewKey = %c", key);    
+        //key = toupper(ThisEvent.EventParam);  
+        //printf("\n\rNewKey = %c", key);    
         
         switch ( toupper(ThisEvent.EventParam))
         {
@@ -132,6 +133,7 @@ ES_Event RunMapKeys( ES_Event ThisEvent )
                        ThisEvent.EventParam = 5;    //sends LSB length
                        break;
             case '4' : ThisEvent.EventType = ES_BYTE_RECEIVED; 
+                       ThisEvent.EventParam = 0x22;  //sends random number
                        break;
             case 'E' : ThisEvent.EventType = ES_UART_ERROR_FLAG; 
                        break;		

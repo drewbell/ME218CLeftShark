@@ -419,6 +419,11 @@
               <FileType>1</FileType>
               <FilePath>.\Source\MapKeys.c</FilePath>
             </File>
+            <File>
+              <FileName>HardwareInits.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Source\HardwareInits.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -538,6 +543,16 @@
               <FileName>MapKeys.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Headers\MapKeys.h</FilePath>
+            </File>
+            <File>
+              <FileName>HardwareInits.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Headers\HardwareInits.h</FilePath>
+            </File>
+            <File>
+              <FileName>DEFINITIONS.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Headers\DEFINITIONS.h</FilePath>
             </File>
           </Files>
         </Group>
